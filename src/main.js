@@ -48,6 +48,7 @@ async function seedHikes() {
 seedHikes();
 
 
+
 //-------------------------------------------------------------------
 // This function gets called whenever the Main page loads.
 // It will find out the User who's logged in.
@@ -112,7 +113,6 @@ function readQuote(day) {
         console.error("Error listening to document: ", error);
     });
 }
-
 //---------------------------------------------------------------------------------
 // This function is called when the page loads (from showName())
 // It will populate the Gallery with one card for each Hike. 
