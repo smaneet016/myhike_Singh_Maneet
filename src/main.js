@@ -4,6 +4,8 @@ import {
 import { db } from "./firebaseConfig.js";
 import { doc, onSnapshot, getDoc } from "firebase/firestore";
 import { collection, getDocs, addDoc, serverTimestamp } from "firebase/firestore";
+import { updateDoc, arrayUnion, arrayRemove } from "firebase/firestore";
+
 
 // Helper function to add the sample hike documents.
 function addHikeData() {
@@ -45,6 +47,17 @@ async function seedHikes() {
 // Call the seeding function when the main.html page loads.
 seedHikes();
 
+
+//-------------------------------------------------------------------
+// This function gets called whenever the Main page loads.
+// It will find out the User who's logged in.
+//   - Read the User's Document in Firestore
+//   - Extract the name, and display it (for that user)
+//   - Extract the bookmarks array (for that user)
+//   - Display all the cards in the gallery, passing in the User's ID and the bookmarks array)
+//     So that the function can decide if it should how a SOLID bookmark icon, or an OUTLINE bookmark icon
+//-------------------------------------------------------------------
+
 function showName() {
 
     // Get the DOM element where the user's name will be displayed
@@ -63,6 +76,7 @@ function showName() {
         // Get the user's Firestore document from the "users" collection
         // Document ID is the user's unique UID
         const userDoc = await getDoc(doc(db, "users", user.uid));
+        const userData = userDoc.exists() ? userDoc.data() : {};
 
         // Determine which name to display:
         const name = userDoc.exists()            // 1️⃣ Use Firestore name if document exists
@@ -73,8 +87,16 @@ function showName() {
         if (nameElement) {
             nameElement.textContent = `${name}!`;
         }
+
+        //Read bookmarks as a plain array (no globals)
+        const bookmarks = userData.bookmarks || [];
+
+        //Display cards, but now pass user's ID and bookmarks (array)
+        await displayCardsDynamically(user.uid, bookmarks);
+ 
     });
 }
+
 
 // Function to read the quote of the day from Firestore
 function readQuote(day) {
@@ -91,16 +113,22 @@ function readQuote(day) {
     });
 }
 
-async function displayCardsDynamically() {
+//---------------------------------------------------------------------------------
+// This function is called when the page loads (from showName())
+// It will populate the Gallery with one card for each Hike. 
+// For each Hike it can decide if the bookmark icon is solid or outline
+// based on the the User's ID, and bookmarks array
+//---------------------------------------------------------------------------------
+async function displayCardsDynamically(userId, bookmarks) {
     let cardTemplate = document.getElementById("hikeCardTemplate");
     const hikesCollectionRef = collection(db, "hikes");
 
     try {
         const querySnapshot = await getDocs(hikesCollectionRef);
-        querySnapshot.forEach(doc => {
-            // Clone the template
+        querySnapshot.forEach(docSnap => {
+            // Clone the card template
             let newcard = cardTemplate.content.cloneNode(true);
-            const hike = doc.data(); // Get hike data once
+            const hike = docSnap.data(); // Get hike data once
 
             // Populate the card with hike data
             newcard.querySelector('.card-title').textContent = hike.name;
@@ -110,7 +138,24 @@ async function displayCardsDynamically() {
             newcard.querySelector('.card-image').src = `./images/${hike.code}.jpg`;
 
             // Add the link with the document ID
-            newcard.querySelector(".read-more").href = `eachHike.html?docID=${doc.id}`;
+            newcard.querySelector(".read-more").href = `eachHike.html?docID=${docSnap.id}`;
+            
+            // -------- NEW CODE STARTS HERE ---------
+            const hikeDocID= docSnap.id;
+            const icon = newcard.querySelector("i.material-icons");
+
+            // Give this icon a unique id based on the hike ID
+            icon.id = "save-" + hikeDocID;
+
+            // Decide initial state from bookmarks array
+            const isBookmarked = bookmarks.includes(hikeDocID);
+            
+            // Set initial bookmark icon based on whether this hike is already in the user's bookmarks
+            icon.innerText = isBookmarked ? "bookmark" : "bookmark_border";
+
+            // On click, call a toggleBookmark
+            icon.onclick = () => toggleBookmark(userId, hikeDocID);
+            // -------- NEW CODE ENDS HERE ---------
 
             // Attach the new card to the container
             document.getElementById("hikes-go-here").appendChild(newcard);
@@ -119,9 +164,6 @@ async function displayCardsDynamically() {
         console.error("Error getting documents: ", error);
     }
 }
-
-// Call the function to display cards when the page loads
-displayCardsDynamically();
 
 readQuote("tuesday");
 
