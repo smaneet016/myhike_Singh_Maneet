@@ -164,6 +164,37 @@ async function displayCardsDynamically(userId, bookmarks) {
         console.error("Error getting documents: ", error);
     }
 }
+async function toggleBookmark(userId, hikeDocID) {
+    const userRef = doc(db, "users", userId);     // get a pointer to the user's document
+    const userSnap = await getDoc(userRef);       // read the user's document one time
+    const userData = userSnap.data() || {};       // default to empty user data
+    const bookmarks = userData.bookmarks || [];   // default to empty bookmarks array
+
+    const iconId = "save-" + hikeDocID;           // construct icon's unique ID given the hike ID
+    const icon = document.getElementById(iconId); // get a pointer to icon DOM
+
+    // JS function ".includes" will return true if an item is found in the array
+    const isBookmarked = bookmarks.includes(hikeDocID);
+
+    // Because this block of code as two aynchronous calls that can be risky/fail
+    // Here's an example of how to wrap it with a try/catch structure for error handling. 
+    try {
+        if (isBookmarked) {
+            // Remove from Firestore array
+            await updateDoc(userRef, { bookmarks: arrayRemove(hikeDocID) });
+            // Update the bookmark icon DOM
+            icon.innerText = "bookmark_border";
+
+        } else {
+            // Add to Firestore array
+            await updateDoc(userRef, { bookmarks: arrayUnion(hikeDocID) });
+            // Update the bookmark icon DOM 
+            icon.innerText = "bookmark";
+        }
+    } catch (err) {
+        console.error("Error toggling bookmark:", err);
+    }
+}
 
 readQuote("tuesday");
 
